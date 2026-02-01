@@ -1,0 +1,13 @@
+cd marimo# Marimo Chain Engine Dependencies
+
+# Core
+pydantic>=2.0.0
+
+# Marimo (for notebook generation and visualization)
+marimo>=0.19.0
+
+# Async support (stdlib, but listed for clarity)
+# asyncio is built-in
+
+# Optional: For Pipecat integration
+# pipecat-ai>=0.1.0

@@ -1,0 +1,50 @@
+@import '@pipecat-ai/voice-ui-kit/styles';
+@import 'tailwindcss';
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(24 24 27);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(63 63 70);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(82 82 91);
+}
+
+/* Smooth animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Override voice-ui-kit styles for our dark theme */
+body {
+  background-color: rgb(9 9 11);
+  color: rgb(244 244 245);
+}
+
+/* Ensure full height */
+html, body, #__next {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}

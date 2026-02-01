@@ -1,0 +1,29 @@
+[project]
+name = "toolCallAgent"
+version = "0.1.0"
+description = "Diagnostic Voice AI Agent with Tool Calling - Built with Pipecat and marimo_engine"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[google,local-smart-turn-v3,openai,runner,silero,webrtc]",
+    "pipecat-ai-whisker",
+    "pipecat-ai-tail",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+# Daily transport is optional (not available on Windows)
+# Install separately if needed: pip install daily-python
+# dependencies = [
+#     "pipecat-ai[daily,openai,runner,silero,webrtc]",
+# ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
