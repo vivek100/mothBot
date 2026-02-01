@@ -25,31 +25,80 @@ Traditional AI agents have a fundamental limitation: they forget. Every conversa
 
 Instead of calling tools one at a time, MothBot executes **intelligent sequences** where data flows between steps.
 
+<table>
+<tr>
+<td width="50%">
+
+**❌ Traditional Agent**
+```
+User: "Check if it's safe"
+
+→ call check_oxygen()     → 14.5%
+→ call analyze_atmosphere() → ❌ ERROR: missing o2_level
+→ call scan_hull()        → 98%
+
+Agent must manually chain results
+No conditional logic
+No data passing between calls
+```
+
+</td>
+<td width="50%">
+
+**✅ MothBot Tool Chain**
+```
+User: "Check if it's safe"
+
+→ Execute safety_check skill:
+  s1: check_oxygen      → 14.5%
+  s2: analyze_atmosphere 
+      args: {o2_level: $s1.level}  ← auto-passed!
+      → severity: HIGH
+  s3: scan_hull
+      run_if: $s2.severity == HIGH  ← conditional!
+      → integrity: 98%
+
+Verdict: INTERVENTION_NEEDED
+```
+
+</td>
+</tr>
+</table>
+
 ```mermaid
 flowchart LR
-    subgraph Traditional["Traditional Agent"]
-        T1[Tool Call] --> R1[Result]
-        T2[Tool Call] --> R2[Result]
-        T3[Tool Call] --> R3[Result]
-    end
-    
-    subgraph MothBot["MothBot Tool Chain"]
+    subgraph Chain["MothBot Tool Chain Execution"]
         direction LR
-        S1["🔍 check_oxygen"] -->|"$s1.level"| S2["📊 analyze_atmosphere"]
-        S2 -->|"$s2.severity"| S3{"run_if: HIGH"}
-        S3 -->|yes| S4["🚨 trigger_alert"]
-        S3 -->|no| S5["✅ log_status"]
+        S1["🔍 check_oxygen"]
+        S2["📊 analyze_atmosphere"]
+        S3{"🔀 run_if:\n severity=HIGH?"}
+        S4["🛡️ scan_hull"]
+        S5["🚨 trigger_alert"]
+        S6["✅ Complete"]
+        
+        S1 -->|"$s1.level = 14.5"| S2
+        S2 -->|"$s2.severity = HIGH"| S3
+        S3 -->|"yes"| S4
+        S3 -->|"no"| S6
+        S4 -->|"intervention_if:\n$s4.integrity < 50"| S5
+        S4 --> S6
     end
     
-    style MothBot fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px
-    style Traditional fill:#2d2d2d,stroke:#666,stroke-width:1px
+    style S1 fill:#0ea5e9,stroke:#0284c7,color:#fff
+    style S2 fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style S3 fill:#f59e0b,stroke:#d97706,color:#fff
+    style S4 fill:#10b981,stroke:#059669,color:#fff
+    style S5 fill:#ef4444,stroke:#dc2626,color:#fff
+    style S6 fill:#22c55e,stroke:#16a34a,color:#fff
 ```
 
 **Key Features:**
-- **Data Passing**: `$s1.level` references output from step 1
-- **Conditional Execution**: `run_if` skips steps based on conditions
-- **Intervention Triggers**: Automatic alerts for critical conditions
-- **Key Findings**: Mark important results for summary
+| Feature | Syntax | Example |
+|---------|--------|---------|
+| **Data Passing** | `$step_id.field` | `$s1.level` → passes oxygen level to next step |
+| **Conditional Execution** | `run_if` | `run_if: "$s1.status == 'OK'"` → skip if condition false |
+| **Intervention Triggers** | `intervention_if` | `intervention_if: "$s2.severity == 'HIGH'"` → alert human |
+| **Key Findings** | `key_finding: true` | Mark critical results for summary |
 
 ### 2. 🧠 Skills (Learned Tool Chains)
 
@@ -167,54 +216,85 @@ Analyzes threads to suggest **code improvements**:
 
 ```mermaid
 flowchart TB
-    subgraph Client["🖥️ Web Frontend (Next.js)"]
-        UI["Chat Interface"]
-        SK["Skills Browser"]
-        EV["Evals Dashboard"]
+    subgraph Client["🖥️ Frontend - Pipecat React SDK"]
+        direction TB
+        UI["💬 Voice/Text Chat UI"]
+        SK["📚 Skills Browser"]
+        EV["📊 Evals Dashboard"]
+        RTVI["🔌 RTVI Protocol"]
+        UI --> RTVI
     end
     
-    subgraph Server["🐍 Python Server"]
+    subgraph Pipecat["🤖 Pipecat Agent Orchestration"]
         direction TB
-        PC["Pipecat Pipeline"]
         
-        subgraph Pipeline["Voice Pipeline"]
-            STT["🎤 Google STT"]
-            LLM["🧠 OpenAI LLM"]
-            TTS["🔊 Google TTS"]
+        subgraph Transport["WebRTC Transport Layer"]
+            WR["SmallWebRTC / Daily"]
+        end
+        
+        subgraph Pipeline["Voice AI Pipeline"]
+            direction LR
+            STT["🎤 STT\nGoogle"]
+            LLM["🧠 LLM\nOpenAI"]
+            TTS["🔊 TTS\nGoogle"]
             STT --> LLM --> TTS
         end
         
-        subgraph Tools["Tool System"]
+        subgraph FunctionCalling["Function Calling"]
             TH["Tool Handlers"]
-            ME["Marimo Engine"]
-            TH --> ME
         end
         
-        PC --> Pipeline
-        LLM -->|"function calls"| Tools
+        WR --> Pipeline
+        LLM -->|"tool calls"| FunctionCalling
     end
     
-    subgraph Weave["📊 Weave (W&B)"]
-        TR["Thread Traces"]
-        TC["Tool Call Logs"]
-        EL["Eval Results"]
+    subgraph Engine["⚙️ Marimo Tool Chain Engine"]
+        direction TB
+        EX["Executor"]
+        EV2["Event Stream"]
+        EXP["Expression Resolver\n($s1.level)"]
+        EX --> EV2
+        EX --> EXP
     end
     
-    subgraph Storage["💾 Skills Storage"]
+    subgraph Skills["💾 Skills Storage"]
         BS["Built-in Skills"]
-        DS["Dynamic Skills"]
+        DS["Dynamic Skills\n(learned)"]
     end
     
-    Client <-->|"WebRTC"| Server
-    Server -->|"traces"| Weave
-    Tools <--> Storage
-    Weave -->|"eval input"| EV
+    subgraph Weave["📊 Weave Observability"]
+        direction TB
+        TH2["Thread Traces"]
+        TC["Tool Call Logs"]
+        ER["Eval Results"]
+    end
     
-    style Client fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px
-    style Server fill:#1a1a2e,stroke:#10b981,stroke-width:2px
-    style Weave fill:#1a1a2e,stroke:#f59e0b,stroke-width:2px
-    style Storage fill:#1a1a2e,stroke:#8b5cf6,stroke-width:2px
+    Client <-->|"WebRTC\nAudio + RTVI Messages"| Transport
+    FunctionCalling --> Engine
+    Engine <--> Skills
+    
+    Pipecat -->|"@weave.op()\ntraces"| Weave
+    Engine -->|"execution\nevents"| Weave
+    
+    Weave -->|"eval data"| EV
+    
+    style Client fill:#0f172a,stroke:#0ea5e9,stroke-width:2px
+    style Pipecat fill:#0f172a,stroke:#22c55e,stroke-width:2px
+    style Engine fill:#0f172a,stroke:#a855f7,stroke-width:2px
+    style Skills fill:#0f172a,stroke:#f59e0b,stroke-width:2px
+    style Weave fill:#0f172a,stroke:#ef4444,stroke-width:2px
 ```
+
+### Component Breakdown
+
+| Layer | Technology | Role |
+|-------|------------|------|
+| **Frontend** | Next.js + Pipecat React SDK | Voice UI, Skills browser, Evals dashboard |
+| **Transport** | Pipecat WebRTC (SmallWebRTC/Daily) | Real-time bidirectional audio + RTVI messages |
+| **Agent Orchestration** | Pipecat Pipeline | STT → LLM → TTS with function calling |
+| **Tool Execution** | Marimo Engine | Streaming tool chain execution with data passing |
+| **Observability** | Weave (W&B) | Thread traces, tool logs, eval results |
+| **Storage** | JSON Files | Built-in + dynamically learned skills |
 
 ---
 
@@ -404,13 +484,14 @@ marimo_engine/
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| **Voice Agent** | Pipecat | Real-time voice pipeline |
-| **Tool Chains** | Marimo Engine | Streaming execution |
-| **Tracing** | Weave (W&B) | Thread & tool call tracking |
-| **LLM** | OpenAI | Function calling & reasoning |
-| **STT/TTS** | Google Cloud | Speech recognition & synthesis |
-| **Frontend** | Next.js + React | Chat UI, Skills browser, Evals |
-| **Transport** | WebRTC | Real-time audio streaming |
+| **Agent Framework** | [Pipecat](https://pipecat.ai) | Voice AI pipeline orchestration, WebRTC transport, RTVI protocol |
+| **Frontend SDK** | Pipecat React SDK | Real-time voice UI components, client-agent connection |
+| **Tool Chains** | Marimo Engine | Streaming execution with data passing & conditionals |
+| **Observability** | [Weave](https://wandb.ai/site/weave) (W&B) | Thread traces, tool call logging, evaluations |
+| **LLM** | OpenAI (gpt-4o-mini) | Function calling & reasoning |
+| **Speech** | Google Cloud STT/TTS | Speech recognition & synthesis |
+| **Frontend** | Next.js 14 + React | Chat UI, Skills browser, Evals dashboard |
+| **Transport** | SmallWebRTC / Daily | Real-time bidirectional audio streaming |
 
 ---
 
