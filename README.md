@@ -6,6 +6,8 @@ MothBot is an intelligent voice agent that doesn't just call tools—it learns f
 
 > Built with **Pipecat** for voice AI, **Marimo** for tool chain execution, and **Weave** for tracing & evaluation.
 
+![Generated Image February 01, 2026 - 2_29PM](https://github.com/user-attachments/assets/de90978a-6bfa-4a7e-ba8f-b475f8a16ad1)
+
 ---
 
 ## 🎯 The Problem
