@@ -6,7 +6,6 @@ import { ThemeProvider } from '@pipecat-ai/voice-ui-kit';
 
 import type { PipecatBaseChildProps } from '@pipecat-ai/voice-ui-kit';
 import {
-  ErrorCard,
   FullScreenContainer,
   PipecatAppBase,
   SpinLoader,
@@ -40,8 +39,6 @@ export default function Home() {
           }: PipecatBaseChildProps) =>
             !client ? (
               <SpinLoader />
-            ) : error ? (
-              <ErrorCard>{error}</ErrorCard>
             ) : (
               <App
                 client={client}
@@ -50,6 +47,7 @@ export default function Home() {
                 transportType={transportType}
                 onTransportChange={setTransportType}
                 availableTransports={AVAILABLE_TRANSPORTS}
+                error={error}
               />
             )
           }

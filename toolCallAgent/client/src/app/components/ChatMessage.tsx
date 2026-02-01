@@ -9,26 +9,26 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
   const isUser = message.role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 ${
           isUser
-            ? 'bg-emerald-600 text-white'
-            : 'bg-zinc-800 text-zinc-100'
+            ? 'bg-gradient-to-r from-cyan-600 to-violet-600 text-white shadow-lg shadow-cyan-500/10'
+            : 'bg-zinc-800/80 text-zinc-100 border border-zinc-700/50'
         }`}
       >
         {!isUser && (
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-cyan-500 via-violet-500 to-fuchsia-500 flex items-center justify-center">
+              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2L8 6H4v4l-4 4 4 4v4h4l4 4 4-4h4v-4l4-4-4-4V6h-4L12 2z" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <span className="text-xs font-medium text-zinc-400">Diagnostic Agent</span>
+            <span className="text-xs font-bold text-cyan-400 tracking-wide">MOTHBOT</span>
           </div>
         )}
         <p className="whitespace-pre-wrap">{message.content}</p>
-        <p className={`text-xs mt-1 ${isUser ? 'text-emerald-200' : 'text-zinc-500'}`}>
+        <p className={`text-xs mt-1 font-mono ${isUser ? 'text-cyan-200/70' : 'text-zinc-500'}`}>
           {message.timestamp.toLocaleTimeString()}
         </p>
       </div>
@@ -45,7 +45,7 @@ export const ToolCallDisplay = ({ message }: ToolCallDisplayProps) => {
   const toolCall = message.toolCall!;
 
   const statusColors = {
-    pending: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30',
+    pending: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/30',
     success: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
     error: 'text-red-400 bg-red-400/10 border-red-400/30',
   };

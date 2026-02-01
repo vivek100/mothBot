@@ -28,6 +28,8 @@ Run the bot using::
 
 import json
 import os
+import threading
+import uuid
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -38,6 +40,7 @@ from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
+import weave
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.processors.frameworks.rtvi import (
@@ -46,6 +49,9 @@ from pipecat.processors.frameworks.rtvi import (
 )
 from pydantic import BaseModel
 from typing import Literal, Any
+
+# Weave tracing imports
+from weave_tracing import init_weave
 
 # Custom RTVI message for function call results
 # We use "server-message" type so the client's serverMessage event fires
@@ -98,7 +104,42 @@ except Exception:
 # Import our tool definitions and handlers
 from tools import SYSTEM_PROMPT, TOOL_DEFINITIONS, execute_tool
 
+
+def _start_skills_api() -> None:
+    """Start Skills API server in a background thread."""
+    if os.getenv("SKILLS_API_ENABLED", "true").lower() != "true":
+        logger.info("Skills API disabled via SKILLS_API_ENABLED")
+        return
+
+    try:
+        from skills_api import app as skills_app  # Local import to avoid startup failures
+        import uvicorn
+    except Exception as exc:
+        logger.warning(f"Skills API not started (import error): {exc}")
+        return
+
+    host = os.getenv("SKILLS_API_HOST", "0.0.0.0")
+    port = int(os.getenv("SKILLS_API_PORT", "7861"))
+
+    def _run_server() -> None:
+        config = uvicorn.Config(skills_app, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        server.run()
+
+    thread = threading.Thread(target=_run_server, daemon=True)
+    thread.start()
+
+    display_host = "localhost" if host == "0.0.0.0" else host
+    logger.info(f"Skills API started at http://{display_host}:{port}")
+
 load_dotenv(override=True)
+
+# Initialize Weave tracing at module load
+_weave_ready = init_weave()
+if _weave_ready:
+    logger.info("🔍 Weave tracing is active - traces will be sent to W&B")
+else:
+    logger.info("⚠️ Weave tracing is not active - check WANDB_API_KEY")
 
 
 def load_google_credentials():
@@ -116,9 +157,10 @@ def load_google_credentials():
     return creds_path
 
 
-async def run_bot(transport: BaseTransport):
-    """Main bot logic with tool calling support."""
-    logger.info("Starting Diagnostic Agent with tool calling")
+@weave.op()
+async def run_bot(transport: BaseTransport, thread_id: str):
+    """Main bot logic with tool calling support - this is the main session operation."""
+    logger.info(f"Starting Diagnostic Agent with tool calling (thread: {thread_id})")
 
     # Load Google credentials (from file or JSON string)
     google_credentials = load_google_credentials()
@@ -144,9 +186,13 @@ async def run_bot(transport: BaseTransport):
 
     # LLM service with tool definitions
     # Supports cheaper models: gpt-4o-mini, gpt-3.5-turbo, etc.
+    # Increase function_call_timeout since our tools have simulated delays (3-6 seconds)
     llm = OpenAILLMService(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),  # Default to cheaper model
         api_key=os.getenv("OPENAI_API_KEY"),
+        params=OpenAILLMService.InputParams(
+            function_call_timeout=30.0,  # Increase from default 10s to handle tool delays
+        ),
     )
     
     # Tool handlers will be registered after task creation (need access to task.rtvi)
@@ -225,7 +271,6 @@ async def run_bot(transport: BaseTransport):
             
             # Notify RTVI about the function call so frontend can display it
             try:
-                # Create the RTVI message directly
                 fn_data = RTVILLMFunctionCallMessageData(
                     function_name=function_name,
                     tool_call_id=tool_call_id,
@@ -237,7 +282,7 @@ async def run_bot(transport: BaseTransport):
             except Exception as e:
                 logger.warning(f"❌ Failed to send function call to RTVI: {e}")
             
-            # Execute the tool
+            # Execute the tool (execute_tool is decorated with @weave.op())
             try:
                 result = await execute_tool(function_name, arguments)
                 logger.info(f"Tool result: {result[:200]}..." if len(result) > 200 else f"Tool result: {result}")
@@ -284,13 +329,19 @@ async def run_bot(transport: BaseTransport):
 
     # Register tools with the LLM (now with RTVI notification)
     tool_names = [
+        # Individual diagnostic tools
         "scan_hull",
         "check_oxygen",
         "analyze_atmosphere",
         "check_temperature",
         "scan_systems",
-        "execute_diagnostic_plan",
-        "list_available_plans",
+        # Skill & tool chain management
+        "list_skills",
+        "get_skill_details",
+        "execute_skill",
+        "create_and_run_tool_chain",
+        "save_tool_chain_as_skill",
+        "delete_saved_skill",
     ]
     
     for tool_name in tool_names:
@@ -370,10 +421,19 @@ async def bot(runner_args: RunnerArguments):
             logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
             return
 
-    await run_bot(transport)
+    # Generate a unique thread ID for this session
+    thread_id = os.getenv("WEAVE_THREAD_ID") or f"session_{uuid.uuid4().hex[:8]}"
+    
+    # Use weave.thread() to group ALL operations under this thread
+    # This includes run_bot and all nested @weave.op() calls
+    with weave.thread(thread_id) as thread_ctx:
+        logger.info(f"🧵 Started Weave thread: {thread_ctx.thread_id}")
+        await run_bot(transport, thread_id)
+        logger.info(f"🧵 Ended Weave thread: {thread_ctx.thread_id}")
 
 
 if __name__ == "__main__":
     from pipecat.runner.run import main
 
+    _start_skills_api()
     main()
