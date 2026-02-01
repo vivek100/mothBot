@@ -25,71 +25,73 @@ Traditional AI agents have a fundamental limitation: they forget. Every conversa
 
 Instead of calling tools one at a time, MothBot executes **intelligent sequences** where data flows between steps.
 
-<table>
-<tr>
-<td width="50%">
-
-**❌ Traditional Agent**
-```
-User: "Check if it's safe"
-
-→ call check_oxygen()     → 14.5%
-→ call analyze_atmosphere() → ❌ ERROR: missing o2_level
-→ call scan_hull()        → 98%
-
-Agent must manually chain results
-No conditional logic
-No data passing between calls
-```
-
-</td>
-<td width="50%">
-
-**✅ MothBot Tool Chain**
-```
-User: "Check if it's safe"
-
-→ Execute safety_check skill:
-  s1: check_oxygen      → 14.5%
-  s2: analyze_atmosphere 
-      args: {o2_level: $s1.level}  ← auto-passed!
-      → severity: HIGH
-  s3: scan_hull
-      run_if: $s2.severity == HIGH  ← conditional!
-      → integrity: 98%
-
-Verdict: INTERVENTION_NEEDED
-```
-
-</td>
-</tr>
-</table>
+#### ❌ Traditional Agent - No Data Flow
 
 ```mermaid
-flowchart LR
-    subgraph Chain["MothBot Tool Chain Execution"]
-        direction LR
-        S1["🔍 check_oxygen"]
-        S2["📊 analyze_atmosphere"]
-        S3{"🔀 run_if:\n severity=HIGH?"}
-        S4["🛡️ scan_hull"]
-        S5["🚨 trigger_alert"]
-        S6["✅ Complete"]
-        
-        S1 -->|"$s1.level = 14.5"| S2
-        S2 -->|"$s2.severity = HIGH"| S3
-        S3 -->|"yes"| S4
-        S3 -->|"no"| S6
-        S4 -->|"intervention_if:\n$s4.integrity < 50"| S5
-        S4 --> S6
+sequenceDiagram
+    participant U as User
+    participant A as Agent
+    participant T1 as check_oxygen
+    participant T2 as analyze_atmosphere
+    participant T3 as scan_hull
+
+    U->>A: "Check if it's safe"
+    
+    A->>T1: call()
+    T1-->>A: {level: 14.5%}
+    
+    A->>T2: call()
+    Note right of T2: ❌ ERROR!<br/>Missing o2_level param
+    T2-->>A: Error: missing required param
+    
+    A->>T3: call()
+    T3-->>A: {integrity: 98%}
+    
+    A->>U: "Oxygen is 14.5%, hull is 98%"
+    Note over A: ⚠️ Missed the atmosphere<br/>analysis entirely!
+```
+
+#### ✅ MothBot Tool Chain - Intelligent Data Passing
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Agent
+    participant E as Marimo Engine
+    participant T1 as check_oxygen
+    participant T2 as analyze_atmosphere
+    participant T3 as scan_hull
+
+    U->>A: "Check if it's safe"
+    A->>E: execute_skill("safety_check")
+    
+    rect rgb(20, 80, 60)
+        Note over E: Step s1
+        E->>T1: call()
+        T1-->>E: {level: 14.5, status: "CRITICAL"}
+        E->>E: context[s1] = result
     end
     
-    style S1 fill:#0ea5e9,stroke:#0284c7,color:#fff
-    style S2 fill:#8b5cf6,stroke:#7c3aed,color:#fff
-    style S3 fill:#f59e0b,stroke:#d97706,color:#fff
-    style S4 fill:#10b981,stroke:#059669,color:#fff
-    style S5 fill:#ef4444,stroke:#dc2626,color:#fff
-    style S6 fill:#22c55e,stroke:#16a34a,color:#fff
+    rect rgb(80, 40, 80)
+        Note over E: Step s2 - Auto data passing!
+        E->>E: resolve $s1.level → 14.5
+        E->>T2: call(o2_level=14.5)
+        T2-->>E: {severity: "HIGH", action: "EVACUATE"}
+        E->>E: context[s2] = result
+    end
+    
+    rect rgb(20, 60, 80)
+        Note over E: Step s3 - Conditional!
+        E->>E: eval run_if: $s2.severity == "HIGH"
+        Note right of E: ✓ Condition TRUE
+        E->>T3: call()
+        T3-->>E: {integrity: 98%}
+        E->>E: eval intervention_if: $s3.integrity < 50
+        Note right of E: ✗ No intervention needed
+    end
+    
+    E-->>A: Verdict: SUCCESS<br/>Key findings: O2 critical
+    A->>U: "Safety check complete:<br/>⚠️ O2 at 14.5% - EVACUATE<br/>✓ Hull integrity 98%"
 ```
 
 **Key Features:**
